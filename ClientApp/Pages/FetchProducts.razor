@@ -1,0 +1,112 @@
+@page "/fetchproducts"
+
+<h3>Product List</h3>
+
+@if (isLoading)
+{
+    <p>Loading products...</p>
+}
+else if (!string.IsNullOrEmpty(errorMessage))
+{
+    <p style="color:red">@errorMessage</p>
+}
+else if (products != null && products.Length > 0)
+{
+        @* <ul>
+            @foreach (var product in products)
+            {
+                <li>
+                    <strong>@product.Name</strong> - $@product.Price  
+                    <br />
+                    Stock: @product.Stock  
+                    <br />
+                    Category: @product.Category.Name
+                </li>
+            }
+        </ul> *@
+
+
+
+       @foreach (var product in products)
+        {
+            <div class="col-md-4">
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">@product.Name</h5>
+                        <p class="card-text">
+                            <strong>Price:</strong> $@product.Price <br />
+                            <strong>Stock:</strong> @product.Stock <br />
+                            <strong>Category:</strong> @product.Category.Name
+                        </p>
+                        <button class="btn btn-primary">View Details</button>
+                    </div>
+                </div>
+            </div>
+        }
+}
+else
+{
+    <p>No products available.</p>
+}
+
+@code {
+    private Product[]? products;
+    private bool isLoading = true;
+    private string? errorMessage;
+
+    [Inject] private HttpClient Http { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+            // Single call: fetch + deserialize
+            products = await Http.GetFromJsonAsync<Product[]>(
+                "http://localhost:5270/api/productlist",
+                new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                },
+                cts.Token
+            );
+
+            if (products == null || products.Length == 0)
+            {
+                errorMessage = "No products returned from server.";
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            errorMessage = "Request timed out. Please try again later.";
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Network error: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Unexpected error: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    public class Category
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+    }
+
+    public class Product
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public double Price { get; set; }
+        public int Stock { get; set; }
+        public Category Category { get; set; } = new Category();
+    }
+}
